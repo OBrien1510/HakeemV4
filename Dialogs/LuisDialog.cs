@@ -59,22 +59,31 @@ namespace HakeemTestV4.Dialogs
                     await QuestionIntent(stepContext);
                     break;
                 case "learning":
-                    AddDialog(new LearningDialog(userState));
+                    
+                    string entity = recognizerResult.Entities["subject"]?.First.ToString();
+                    Debug.WriteLine("entity " + entity);
+                    AddDialog(new LearningDialog(userState, entity));
                     return await stepContext.ReplaceDialogAsync(nameof(LearningDialog));
                 case "suggestion":
                     AddDialog(new RecommendDialog(userState));
                     return await stepContext.ReplaceDialogAsync(nameof(RecommendDialog));
                 case "Preferences":
-                    if (FindDialog(nameof(EditPreferences)) == null)
-                    {
-                        AddDialog(new EditPreferences(userState));
-                    }
+                    AddDialog(new EditPreferences(userState));
                     return await stepContext.ReplaceDialogAsync(nameof(EditPreferences));
-                
-                    
+                default:
+                    AddDialog(new LearningDialog(userState, null));
+                    return await stepContext.ReplaceDialogAsync(nameof(LearningDialog));
+
             }
-            Debug.WriteLine("here");
+            AddDialog(new LearningDialog(userState, null));
             return await stepContext.ReplaceDialogAsync(nameof(LearningDialog));
+        }
+
+        private async Task<DialogTurnResult> LearningIntent(WaterfallStepContext stepContext, RecognizerResult result)
+        {
+            string entity = result.Entities["subject"]?.First.ToString();
+            
+            return await stepContext.ReplaceDialogAsync(nameof(LearningDialog), entity);
         }
 
         private async Task CommandIntent(WaterfallStepContext stepContext)

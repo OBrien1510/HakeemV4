@@ -27,7 +27,7 @@ namespace HakeemTestV4.Dialogs
                 ProcessCommand,
             }));
             AddDialog(new TextPrompt("textPrompt"));
-            AddDialog(new LearningDialog(userState));
+            AddDialog(new LearningDialog(userState, null));
             AddDialog(new LuisDialog(userState));
 
             InitialDialogId = "waterfall";

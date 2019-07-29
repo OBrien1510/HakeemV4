@@ -14,10 +14,11 @@ namespace HakeemTestV4.Dialogs
 {
     public class EditPreferences : ComponentDialog
     {
+        UserState userState;
         public EditPreferences(UserState userState) : base(nameof(EditPreferences))
         {
             InitialDialogId = "waterfall";
-
+            this.userState = userState;
             AddDialog(new WaterfallDialog("waterfall", new WaterfallStep[]
             {
                 StartAsync,
@@ -670,8 +671,9 @@ namespace HakeemTestV4.Dialogs
 
                 case "Continue":
                     /* Bring the user back to the main dialog */
-
-                    return await stepContext.EndDialogAsync();
+                    AddDialog(new LearningDialog(userState, null));
+                    return await stepContext.ReplaceDialogAsync(nameof(LearningDialog));
+                    
                     
                 case "استمر":
                     return await stepContext.EndDialogAsync();

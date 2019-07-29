@@ -18,10 +18,14 @@ namespace HakeemTestV4.Dialogs
     {
         private IStatePropertyAccessor<UserDataCollection> _userStateAccessor;
         private UserState userState;
-        public LearningDialog(UserState userState) : base(nameof(LearningDialog))
+        private string start;
+        public LearningDialog(UserState userState, string start) : base(nameof(LearningDialog))
         {
             this.userState = userState;
+            this.start = start;
+            Debug.WriteLine("start: " + start);
             _userStateAccessor = userState.CreateProperty<UserDataCollection>(nameof(UserDataCollection));
+
             AddDialog(new WaterfallDialog("waterfall", new WaterfallStep[]
             {
 				CheckCourses,
@@ -30,11 +34,25 @@ namespace HakeemTestV4.Dialogs
 				DisplayCourses,
 				DisplayFinalCourse
             }));
+            AddDialog(new WaterfallDialog("waterfall2", new WaterfallStep[]
+           {
+                DisplaySubTopics,
+                DisplayCourses,
+                DisplayFinalCourse
+           }));
             AddDialog(new CheckCourseDialog(userState));
             
             AddDialog(new TextPrompt("text"));
-            
-            InitialDialogId = "waterfall";
+            if (this.start == null)
+            {
+                Debug.WriteLine("here2");
+                InitialDialogId = "waterfall";
+            }
+            else
+            {
+                Debug.WriteLine("Here");
+                InitialDialogId = "waterfall2";
+            }
         }
 
 		private async Task<DialogTurnResult> CheckCourses(WaterfallStepContext stepContext, CancellationToken cancellationToken)
@@ -105,9 +123,14 @@ namespace HakeemTestV4.Dialogs
         {
             UserDataCollection userProfile = await _userStateAccessor.GetAsync(stepContext.Context, () => new UserDataCollection());
             string choice = (string)stepContext.Result;
-            if (String.IsNullOrEmpty(choice))
+            
+            if (String.IsNullOrEmpty(choice) && stepContext.Values.ContainsKey("CurrentTopic"))
             {
                 choice = (string)stepContext.Values["currentTopic"];
+            }
+            else if (String.IsNullOrEmpty(choice))
+            {
+                choice = start;
             }
             else
             {
@@ -119,10 +142,10 @@ namespace HakeemTestV4.Dialogs
                 return await stepContext.NextAsync();
             }
             List<dynamic> unique_subtopics = SaveConversationData.GetUniqueSubTopics(choice);
-            List<dynamic> unique_topics = SaveConversationData.GetUniqueTopics();
-            if (!unique_topics.Contains(choice))
+            
+            if (unique_subtopics.Count == 0)
             {
-                
+                AddDialog(new LuisDialog(userState));
                 return await stepContext.ReplaceDialogAsync(nameof(LuisDialog));
             }
             var reply = MessageFactory.Text("Selected the sub-topic you wish to explore");
@@ -166,7 +189,7 @@ namespace HakeemTestV4.Dialogs
                 AddDialog(new LuisDialog(userState));
                 return await stepContext.ReplaceDialogAsync(nameof(LuisDialog));
             }
-            Debug.WriteLine("Post Luis");
+            
             var reply = MessageFactory.Text($"Here are all the courses I know on {choice}");
             
             List<CardAction> childSuggestions = new List<CardAction>();
@@ -205,6 +228,10 @@ namespace HakeemTestV4.Dialogs
                 return await stepContext.NextAsync();
             }
             CourseList course = SaveConversationData.GetCourseByName(choice);
+            if (course == null)
+            {
+                return await stepContext.ReplaceDialogAsync(nameof(LuisDialog));
+            }
             await stepContext.Context.SendActivityAsync(MessageFactory.Text($"Good choice! This is what I know about the course {course.courseName}"));
             string courseInfo = "";
             if (course.selfPaced)
