@@ -12,6 +12,7 @@ using Microsoft.Bot.Schema;
 using Microsoft.Bot.Builder.AI.Luis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using HakeemTestV4.Database;
 
 namespace HakeemTestV4.Dialogs
 {
@@ -20,9 +21,10 @@ namespace HakeemTestV4.Dialogs
 
         protected readonly LuisApplication luisApplication;
         private UserState userState;
-
+        private IStatePropertyAccessor<UserDataCollection> userStateAccessor;
         public LuisDialog(UserState userState) : base(nameof(LuisDialog))
         {
+            userStateAccessor = userState.CreateProperty<UserDataCollection>(nameof(UserDataCollection));
             this.userState = userState;
             luisApplication = new LuisApplication(
                 "285d2e50-ca52-41a6-9325-19c10303a0b9",
@@ -61,7 +63,7 @@ namespace HakeemTestV4.Dialogs
                 case "learning":
                     
                     string entity = recognizerResult.Entities["subject"]?.First.ToString();
-                    Debug.WriteLine("entity " + entity);
+                    
                     AddDialog(new LearningDialog(userState, entity));
                     return await stepContext.ReplaceDialogAsync(nameof(LearningDialog));
                 case "suggestion":
@@ -70,22 +72,56 @@ namespace HakeemTestV4.Dialogs
                 case "Preferences":
                     AddDialog(new EditPreferences(userState));
                     return await stepContext.ReplaceDialogAsync(nameof(EditPreferences));
+                case "Restart":
+                    AddDialog(new LearningDialog(userState, null));
+                    return await stepContext.ReplaceDialogAsync(nameof(LearningDialog));
+                case "ChangeLanguage":
+                    await ChangeLanguage(stepContext, recognizerResult);
+                    break;
+                case "None":
+                case "Gibberish":
+                    await stepContext.Context.SendActivityAsync(MessageFactory.Text("Sorry I understand that!"));
+                    break;
                 default:
                     AddDialog(new LearningDialog(userState, null));
                     return await stepContext.ReplaceDialogAsync(nameof(LearningDialog));
 
             }
             AddDialog(new LearningDialog(userState, null));
+            UserDataCollection userProfile = await userStateAccessor.GetAsync(stepContext.Context, () => new UserDataCollection());
+            Debug.WriteLine($"Language after {userProfile.language}");
             return await stepContext.ReplaceDialogAsync(nameof(LearningDialog));
         }
 
-        private async Task<DialogTurnResult> LearningIntent(WaterfallStepContext stepContext, RecognizerResult result)
+        private async Task ChangeLanguage(WaterfallStepContext stepContext, RecognizerResult result)
         {
-            string entity = result.Entities["subject"]?.First.ToString();
-            
-            return await stepContext.ReplaceDialogAsync(nameof(LearningDialog), entity);
+            string entity = result.Entities["Language"]?.First.ToString();
+            UserDataCollection userProfile = await userStateAccessor.GetAsync(stepContext.Context, () => new UserDataCollection());
+            Debug.WriteLine($"Language before {userProfile.language}");
+            Debug.WriteLine("entity " + entity);
+            // user has specified which language they want to change to
+            if (entity != null && entity.ToLower() == "arabic" || entity.ToLower() == "english")
+            {
+                userProfile.language = entity.ToLower();
+            }
+            // user has not specified the language but intends to change language
+            else
+            {
+                if (userProfile.language.ToLower() == "english")
+                {
+                    userProfile.language = "arabic";
+                }
+                else
+                {
+                    userProfile.language = "english";
+                }
+            }
+
+            Debug.WriteLine("Saving");
+            await userStateAccessor.SetAsync(stepContext.Context, userProfile);
         }
 
+        
         private async Task CommandIntent(WaterfallStepContext stepContext)
         {
             await stepContext.Context.SendActivityAsync(MessageFactory.Text("A list of the commands you can type or say:"));

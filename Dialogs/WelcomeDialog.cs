@@ -61,12 +61,12 @@ namespace HakeemTestV4.Dialogs
             if (choice.ToLower() == "english")
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("Great! I'll use English from now on"));
-                userProfile.language = "en";
+                userProfile.language = "english";
             }
             else
             {
                 await stepContext.Context.SendActivityAsync(MessageFactory.Text("عظيم سأستخدم اللغة العربية"));
-                userProfile.language = "ar";
+                userProfile.language = "arabic";
             }
 
             return await stepContext.NextAsync();

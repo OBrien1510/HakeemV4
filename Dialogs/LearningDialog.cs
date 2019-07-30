@@ -11,6 +11,7 @@ using Newtonsoft.Json.Linq;
 using Microsoft.Bot.Schema;
 using HakeemTestV4.Dialogs;
 using HakeemTestV4.Database;
+using HakeemTestV4.SupportClasses;
 
 namespace HakeemTestV4.Dialogs
 {
@@ -99,20 +100,41 @@ namespace HakeemTestV4.Dialogs
 
 		private async Task<DialogTurnResult> DisplayTopics(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            
-            await stepContext.Context.SendActivityAsync(MessageFactory.Text("Let's get to learning then!"));
-            var reply = MessageFactory.Text("Please select the subject that you want to explore.");
-            List<dynamic> unique_topics = SaveConversationData.GetUniqueTopics();
-            List<CardAction> childSuggestions = new List<CardAction>();
-			foreach (string topic in unique_topics)
+            UserDataCollection userProfile = await _userStateAccessor.GetAsync(stepContext.Context, () => new UserDataCollection());
+            stepContext.Values["SessionLang"] = userProfile.language;
+            var reply = MessageFactory.Text("");
+            if (userProfile.language.ToLower() == "english")
             {
-                childSuggestions.Add(new CardAction() { Title = topic, Type = ActionTypes.ImBack, Value = topic });
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text("Let's get to learning then!"));
+                reply.Text = "Please select the subject that you want to explore.";
+                List<dynamic> unique_topics = SaveConversationData.GetUniqueTopics();
+                List<CardAction> childSuggestions = new List<CardAction>();
+                foreach (string topic in unique_topics)
+                {
+                    childSuggestions.Add(new CardAction() { Title = topic, Type = ActionTypes.ImBack, Value = topic });
+                }
+                childSuggestions.Add(new CardAction() { Title = "Go Back", Type = ActionTypes.ImBack, Value = "Go Back" });
+                reply.SuggestedActions = new SuggestedActions()
+                {
+                    Actions = childSuggestions
+                };
             }
-            childSuggestions.Add(new CardAction() { Title = "Go Back", Type = ActionTypes.ImBack, Value = "Go Back" });
-            reply.SuggestedActions = new SuggestedActions()
+            else
             {
-                Actions = childSuggestions
-            };
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text(await Translate.Translator("Let's get to learning then!", "ar")));
+                reply.Text = await Translate.Translator("Please select the subject that you want to explore.", "ar");
+                List<dynamic> unique_topics = SaveConversationData.GetUniqueTopics();
+                List<CardAction> childSuggestions = new List<CardAction>();
+                foreach (string topic in unique_topics)
+                {
+                    childSuggestions.Add(new CardAction() { Title = topic, Type = ActionTypes.ImBack, Value = topic });
+                }
+                childSuggestions.Add(new CardAction() { Title = await Translate.Translator("Go Back", "ar"), Type = ActionTypes.ImBack, Value = await Translate.Translator("Go Back", "ar") });
+                reply.SuggestedActions = new SuggestedActions()
+                {
+                    Actions = childSuggestions
+                };
+            }
 
             await stepContext.Context.SendActivityAsync(reply);
 
@@ -122,6 +144,8 @@ namespace HakeemTestV4.Dialogs
         private async Task<DialogTurnResult> DisplaySubTopics(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
             UserDataCollection userProfile = await _userStateAccessor.GetAsync(stepContext.Context, () => new UserDataCollection());
+            stepContext.Values["SessionLang"] = userProfile.language;
+            
             string choice = (string)stepContext.Result;
             
             if (String.IsNullOrEmpty(choice) && stepContext.Values.ContainsKey("CurrentTopic"))
@@ -148,19 +172,37 @@ namespace HakeemTestV4.Dialogs
                 AddDialog(new LuisDialog(userState));
                 return await stepContext.ReplaceDialogAsync(nameof(LuisDialog));
             }
-            var reply = MessageFactory.Text("Selected the sub-topic you wish to explore");
-
-            List<CardAction> childSuggestions = new List<CardAction>();
-            foreach (string topic in unique_subtopics)
+            var reply = MessageFactory.Text("");
+            if (userProfile.language.ToLower() == "english")
             {
-                childSuggestions.Add(new CardAction() { Title = topic, Type = ActionTypes.ImBack, Value = topic });
+                reply.Text = "Selected the sub-topic you wish to explore";
+
+                List<CardAction> childSuggestions = new List<CardAction>();
+                foreach (string topic in unique_subtopics)
+                {
+                    childSuggestions.Add(new CardAction() { Title = topic, Type = ActionTypes.ImBack, Value = topic });
+                }
+                childSuggestions.Add(new CardAction() { Title = "Go Back", Type = ActionTypes.ImBack, Value = "Go Back" });
+                reply.SuggestedActions = new SuggestedActions()
+                {
+                    Actions = childSuggestions
+                };
             }
-            childSuggestions.Add(new CardAction() { Title = "Go Back", Type = ActionTypes.ImBack, Value = "Go Back" });
-            reply.SuggestedActions = new SuggestedActions()
+            else
             {
-                Actions = childSuggestions
-            };
+                reply.Text = await Translate.Translator("Selected the sub-topic you wish to explore", "ar");
 
+                List<CardAction> childSuggestions = new List<CardAction>();
+                foreach (string topic in unique_subtopics)
+                {
+                    childSuggestions.Add(new CardAction() { Title = await Translate.Translator(topic, "ar"), Type = ActionTypes.ImBack, Value = await Translate.Translator(topic, "ar") });
+                }
+                childSuggestions.Add(new CardAction() { Title = await Translate.Translator("Go Back", "ar"), Type = ActionTypes.ImBack, Value = await Translate.Translator("Go Back", "ar") });
+                reply.SuggestedActions = new SuggestedActions()
+                {
+                    Actions = childSuggestions
+                };
+            }
             await stepContext.Context.SendActivityAsync(reply);
 
             return await stepContext.PromptAsync("text", new PromptOptions());
@@ -170,6 +212,7 @@ namespace HakeemTestV4.Dialogs
         {
             string choice = (string)stepContext.Result;
             Debug.WriteLine($"Choice: {choice}");
+            string language = (string)stepContext.Values["SessionLang"];
             if (String.IsNullOrEmpty(choice))
             {
                 choice = (string)stepContext.Values["currentSubTopic"];
@@ -189,20 +232,38 @@ namespace HakeemTestV4.Dialogs
                 AddDialog(new LuisDialog(userState));
                 return await stepContext.ReplaceDialogAsync(nameof(LuisDialog));
             }
-            
-            var reply = MessageFactory.Text($"Here are all the courses I know on {choice}");
-            
-            List<CardAction> childSuggestions = new List<CardAction>();
-            foreach (CourseList c in course_by_sub)
-            {
-                childSuggestions.Add(new CardAction() { Title = c.courseName, Type = ActionTypes.ImBack, Value = c.courseName });
-            }
-            childSuggestions.Add(new CardAction() { Title = "Go Back", Type = ActionTypes.ImBack, Value = "Go Back" });
-            reply.SuggestedActions = new SuggestedActions()
-            {
-                Actions = childSuggestions
-            };
 
+            var reply = MessageFactory.Text("");
+            if (language.ToLower() == "english")
+            {
+                reply.Text = $"Here are all the courses I know on {choice}";
+
+                List<CardAction> childSuggestions = new List<CardAction>();
+                foreach (CourseList c in course_by_sub)
+                {
+                    childSuggestions.Add(new CardAction() { Title = c.courseName, Type = ActionTypes.ImBack, Value = c.courseName });
+                }
+                childSuggestions.Add(new CardAction() { Title = "Go Back", Type = ActionTypes.ImBack, Value = "Go Back" });
+                reply.SuggestedActions = new SuggestedActions()
+                {
+                    Actions = childSuggestions
+                };
+            }
+            else
+            {
+                reply.Text = await Translate.Translator($"Here are all the courses I know on {choice}", "ar");
+
+                List<CardAction> childSuggestions = new List<CardAction>();
+                foreach (CourseList c in course_by_sub)
+                {
+                    childSuggestions.Add(new CardAction() { Title = await Translate.Translator(c.courseName, "ar"), Type = ActionTypes.ImBack, Value = await Translate.Translator(c.courseName, "ar") });
+                }
+                childSuggestions.Add(new CardAction() { Title = await Translate.Translator("Go Back", "ar"), Type = ActionTypes.ImBack, Value = await Translate.Translator("Go Back", "ar") });
+                reply.SuggestedActions = new SuggestedActions()
+                {
+                    Actions = childSuggestions
+                };
+            }
             await stepContext.Context.SendActivityAsync(reply);
 
             return await stepContext.PromptAsync("text", new PromptOptions());
@@ -211,9 +272,8 @@ namespace HakeemTestV4.Dialogs
 		private async Task<DialogTurnResult> DisplayFinalCourse(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
 
-            Debug.WriteLine("display");
-           
             string choice = (string)stepContext.Result;
+            string language = (string)stepContext.Values["SessionLang"];
             if (String.IsNullOrEmpty(choice))
             {
                 choice = (string)stepContext.Values["currentCourse"];
@@ -232,37 +292,85 @@ namespace HakeemTestV4.Dialogs
             {
                 return await stepContext.ReplaceDialogAsync(nameof(LuisDialog));
             }
-            await stepContext.Context.SendActivityAsync(MessageFactory.Text($"Good choice! This is what I know about the course {course.courseName}"));
             string courseInfo = "";
-            if (course.selfPaced)
+            var options = MessageFactory.Text("");
+            if (language == "english")
             {
-                courseInfo += "This is a self-paced course, taking approximately " + course.approxDuration.ToString() + " hours\n\n";
-            }
-            else
-            {
-                courseInfo += "This is a scheduled-learning course, taking approximately " + course.approxDuration.ToString() + " hours\n\n";
-            }
-            if (course.accreditationOption)
-            {
-                courseInfo += "There is an option for accreditation available for this course, although a charge may apply\n\n";
-            }
-            else
-            {
-                courseInfo += "There is no option for accreditation available\n\n";
-            }
-            if (course.financialAid)
-            {
-                courseInfo += "Financial aid is available and can be applied for\n\n";
-            }
-            else
-            {
-                courseInfo += "There is no financial aid available\n\n";
-            }
-            courseInfo += "The course description is here:\n";
-            courseInfo += course.description;
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text($"Good choice! This is what I know about the course {course.courseName}"));
 
+                if (course.selfPaced)
+                {
+                    courseInfo += "This is a self-paced course, taking approximately " + course.approxDuration.ToString() + " hours\n\n";
+                }
+                else
+                {
+                    courseInfo += "This is a scheduled-learning course, taking approximately " + course.approxDuration.ToString() + " hours\n\n";
+                }
+                if (course.accreditationOption)
+                {
+                    courseInfo += "There is an option for accreditation available for this course, although a charge may apply\n\n";
+                }
+                else
+                {
+                    courseInfo += "There is no option for accreditation available\n\n";
+                }
+                if (course.financialAid)
+                {
+                    courseInfo += "Financial aid is available and can be applied for\n\n";
+                }
+                else
+                {
+                    courseInfo += "There is no financial aid available\n\n";
+                }
+                courseInfo += "The course description is here:\n";
+                courseInfo += course.description;
+                await stepContext.Context.SendActivityAsync(courseInfo);
+            }
+            else
+            {
+                await stepContext.Context.SendActivityAsync(MessageFactory.Text(await Translate.Translator($"Good choice! This is what I know about the course {course.courseName}", "ar")));
+                courseInfo = "";
+                if (course.selfPaced)
+                {
+                    courseInfo += await Translate.Translator("This is a self-paced course, taking approximately " + course.approxDuration.ToString() + " hours\n\n", "ar");
+                }
+                else
+                {
+                    courseInfo += await Translate.Translator("This is a scheduled-learning course, taking approximately " + course.approxDuration.ToString() + " hours\n\n", "ar");
+                }
+                if (course.accreditationOption)
+                {
+                    courseInfo += await Translate.Translator("There is an option for accreditation available for this course, although a charge may apply\n\n", "ar");
+                }
+                else
+                {
+                    courseInfo += await Translate.Translator("There is no option for accreditation available\n\n", "ar");
+                }
+                if (course.financialAid)
+                {
+                    courseInfo += await Translate.Translator("Financial aid is available and can be applied for\n\n", "ar");
+                }
+                else
+                {
+                    courseInfo += await Translate.Translator("There is no financial aid available\n\n", "ar");
+                }
+                courseInfo += await Translate.Translator("The course description is here:\n", "ar");
+                courseInfo += course.description;
+                
+                await stepContext.Context.SendActivityAsync(courseInfo);
+                options.Text = await Translate.Translator("Would you like to take this course?", "ar");
+                options.SuggestedActions = new SuggestedActions()
+                {
+                    Actions = new List<CardAction>()
+                        {
+                            new CardAction(){ Title = await Translate.Translator("Take Course", "ar"), Type = ActionTypes.ImBack, Value = await Translate.Translator("Take Course", "ar") },
+                            new CardAction(){ Title = await Translate.Translator("Go Back", "ar"), Type = ActionTypes.ImBack, Value = await Translate.Translator("Go Back", "ar")}
+                        }
+                };
+
+            }
             await stepContext.Context.SendActivityAsync(courseInfo);
-            var options = MessageFactory.Text("Would you like to take this course?");
+            options.Text = "Would you like to take this course?";
             
             options.SuggestedActions = new SuggestedActions()
             {
