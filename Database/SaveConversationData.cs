@@ -332,7 +332,10 @@ namespace HakeemTestV4.Database
 
         public static string CourseToSubject(string course_name)
         {
+            Debug.WriteLine("finding");
+            Debug.WriteLine(course_name);
             CourseList course = CoursesCollection.Find(x => x.courseName == course_name).FirstOrDefault();
+            Debug.WriteLine("found");
             if (course != null)
             {
                 return course.subTopic;
@@ -455,7 +458,7 @@ namespace HakeemTestV4.Database
             return CoursesCollection.Find(x => x.courseName.ToLower() == name.ToLower() || x.courseNameArabic == name).FirstOrDefault();
         }
 
-        public static async Task SaveNewUser(string user_id, string name)
+        public static async Task SaveNewUser(string user_id, UserDataCollection user)
         {
             /* Saves a new user to the database who has accepted the privacy policy
              * Name and Skype ID are saved and the other fields are populated with default values
@@ -463,7 +466,8 @@ namespace HakeemTestV4.Database
 
             await UserDataCollection.InsertOneAsync(new UserDataCollection
             {
-                Name = name,
+                Name = user.Name,
+                gender = user.gender,
                 Notification = 7,
                 PreferedLang = "English",
                 PreferedSub = new List<string>(),
@@ -656,6 +660,8 @@ namespace HakeemTestV4.Database
         public string courseNameArabic { get; set; }
         public string topic { get; set; }
         public string subTopic { get; set; }
+        public string topicArabic { get; set; }
+        public string subTopicArabic { get; set; }
         public string[] languageDelivered { get; set; }
         public string level { get; set; }
         public bool accreditationOption { get; set; }

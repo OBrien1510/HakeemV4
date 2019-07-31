@@ -61,9 +61,7 @@ namespace HakeemTestV4.Dialogs
                     await QuestionIntent(stepContext);
                     break;
                 case "learning":
-                    
-                    string entity = recognizerResult.Entities["subject"]?.First.ToString();
-                    
+                    string entity = recognizerResult.Entities["subject"]?.First.ToString(); 
                     AddDialog(new LearningDialog(userState, entity));
                     return await stepContext.ReplaceDialogAsync(nameof(LearningDialog));
                 case "suggestion":

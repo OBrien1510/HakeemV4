@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,64 +15,30 @@ using HakeemTestV4.Database;
 
 namespace HakeemTestV4.Dialogs
 {
-    public class RootDialog : ComponentDialog
+    public class HowAreYou : ComponentDialog
     {
-
         private IStatePropertyAccessor<UserDataCollection> _userStateAccessor;
-        protected readonly string endpoint = "https://northeurope.api.cognitive.microsoft.com/luis/v2.0/apps/285d2e50-ca52-41a6-9325-19c10303a0b9?verbose=true&timezoneOffset=60&subscription-key=ea767ffa5069422b9f377427b35c412e&q=";
         private UserState userState;
-        public RootDialog(UserState userState)
-            : base("root")
-        {
+        protected readonly string endpoint = "https://northeurope.api.cognitive.microsoft.com/luis/v2.0/apps/285d2e50-ca52-41a6-9325-19c10303a0b9?verbose=true&timezoneOffset=60&subscription-key=ea767ffa5069422b9f377427b35c412e&q=";
 
-            // add check here to see if a new user has been added (send to welcome)
-            
+        public HowAreYou(UserState userState) : base(nameof(HowAreYou))
+        {
             this.userState = userState;
             _userStateAccessor = userState.CreateProperty<UserDataCollection>(nameof(UserDataCollection));
-            AddDialog(new WaterfallDialog("waterfall", new WaterfallStep[] {
-                StartDialogAsync,
-                HowAreYou,
-                HowAreYouResponse,
+
+            AddDialog(new WaterfallDialog("waterfall", new WaterfallStep[]
+            {
+                HowAreYouQuestion,
+                HowAreYouResponse
             }));
-            AddDialog(new TextPrompt("text"));
-            AddDialog(new LuisDialog(userState));
-            
-            
-            
-            InitialDialogId = "waterfall";
-
         }
 
-        private async Task<DialogTurnResult> StartDialogAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        private async Task<DialogTurnResult> HowAreYouQuestion(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            Debug.WriteLine("in root");
-            bool userExists = SaveConversationData.CheckUserExists(stepContext.Context.Activity.From.Id);
-            // check if user is new (if so, send welcome message)
-            if (!userExists)
-            {
-                AddDialog(new WelcomeDialog(userState));
-                return await stepContext.BeginDialogAsync(nameof(WelcomeDialog));
-            }
-            else
-            {
-                UserDataCollection user = SaveConversationData.GetUserDataCollection(stepContext.Context.Activity.From.Id).Result;
-                await _userStateAccessor.SetAsync(stepContext.Context, user);
-                Debug.WriteLine("sending to how 1");
-                AddDialog(new HowAreYou(userState));
-                return await stepContext.ReplaceDialogAsync(nameof(HowAreYou));
-            }
-            
-            
-        }
-
-
-
-        private async Task<DialogTurnResult> HowAreYou(WaterfallStepContext stepContext, CancellationToken cancellationToken)
-        {
-            UserDataCollection user = (UserDataCollection)stepContext.Result;
+            UserDataCollection userProfile = await _userStateAccessor.GetAsync(stepContext.Context, () => new UserDataCollection());
             // var userStateAccessors = userState.CreateProperty<UserDataCollection>(nameof(UserDataCollection));
             // var userProfile = await userStateAccessors.GetAsync(stepContext.Context, () => new UserDataCollection());
-            PromptOptions promptOption = new PromptOptions { Prompt = MessageFactory.Text("Hello " + user.Name + ", how are you today?") };
+            PromptOptions promptOption = new PromptOptions { Prompt = MessageFactory.Text("Hello " + userProfile.Name + ", how are you today?") };
             return await stepContext.PromptAsync("text", promptOption);
         }
 
@@ -104,8 +70,5 @@ namespace HakeemTestV4.Dialogs
             AddDialog(new CommandDialog(userState));
             return await stepContext.ReplaceDialogAsync(nameof(CommandDialog), cancellationToken);
         }
-
-        
-       
     }
 }

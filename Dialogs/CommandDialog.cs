@@ -35,6 +35,10 @@ namespace HakeemTestV4.Dialogs
 
         private async Task<DialogTurnResult> DisplayCommands(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
+            UserDataCollection userProfile = await _userStateAccessor.GetAsync(stepContext.Context, () => new UserDataCollection());
+            Debug.WriteLine("name " + userProfile.Name);
+            Debug.WriteLine("gender " + userProfile.gender);
+            
             await stepContext.Context.SendActivityAsync(MessageFactory.Text("You can switch between English and Arabic at any time by simply sending your message in the language you want to use."));
             await stepContext.Context.SendActivityAsync(MessageFactory.Text("Before we get started, take a second to learn about what I can do. You can also type “Commands” at any time to view other commands you can use."));
             List<Choice> suggested = new List<Choice>();
